@@ -1,0 +1,28 @@
+# Generated data and artifacts
+data/
+artifacts/
+captures/
+
+# Local support files, not part of the project
+tmp/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Environment
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# AI code assistants
+.agents/
+.claude/
+skills-lock.json
+CLAUDE.md
