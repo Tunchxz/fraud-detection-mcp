@@ -1,0 +1,40 @@
+[project]
+name = "fraud-detection-mcp"
+version = "0.1.0"
+description = "MCP server and terminal chatbot for bank fraud monitoring"
+requires-python = "==3.12.*"
+dependencies = [
+    "anthropic>=0.40",
+    "python-dotenv>=1.0",
+    "rich>=13.7",
+]
+
+# The MCP server is launched by a host process with an arbitrary working
+# directory, so the packages must be importable by name rather than by path.
+# Installing the project provides that, plus the console script below.
+[project.scripts]
+fraud-mcp-stdio = "fraud_mcp.entrypoints.stdio_main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_core", "src/fraud_mcp"]
+
+# Only the offline ML work needs these. They are never installed in the
+# container that runs the MCP server.
+[dependency-groups]
+train = [
+    "ipykernel>=6.29",
+    "matplotlib>=3.8",
+    "nbconvert>=7.16",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+]
+dev = [
+    "pytest>=8.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
