@@ -8,7 +8,7 @@ is what makes the local and the remote server one server rather than two.
 from __future__ import annotations
 
 from fraud_mcp.domain.model import RiskModel
-from fraud_mcp.infra import db
+from fraud_mcp.infra import db, seed
 from fraud_mcp.tools import accounts, cards, cases, scoring, transactions
 from fraud_mcp.tools.base import ToolContext
 from mcp_core.protocol import ServerInfo
@@ -35,7 +35,15 @@ INSTRUCTIONS = (
 TOOL_MODULES = (accounts, transactions, scoring, cards, cases)
 
 
-def build_context() -> ToolContext:
+def build_context(log=None) -> ToolContext:
+    """Opens the database and loads the model, building the database if it is missing."""
+    summary = seed.ensure_database()
+    if summary is not None and log is not None:
+        log.note(
+            f"database built from the seed extract: {summary.accounts} accounts, "
+            f"{summary.transactions:,} transactions up to {summary.last_ts}"
+        )
+
     return ToolContext(connection=db.connect(), model=RiskModel.load())
 
 

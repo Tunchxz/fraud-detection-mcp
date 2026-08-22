@@ -20,7 +20,7 @@ def main() -> int:
     log = MessageLog()
 
     try:
-        context = server.build_context()
+        context = server.build_context(log)
     except FileNotFoundError as error:
         print(f"fraud-mcp: {error}", file=sys.stderr, flush=True)
         return 1
