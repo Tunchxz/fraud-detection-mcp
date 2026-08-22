@@ -4,8 +4,9 @@ Launches the real server process and speaks to it through pipes (just as a host 
 This is what proves the transport, the handshake and the tools work together; the other test
 modules exercise the pieces in isolation.
 
-The server runs against a copy of the database so freezing a card and opening disputes
-here does not disturb the one used for manual testing.
+Each test gets its own copy of a database built from the versioned seed extract, so freezing a
+card or opening a dispute disturbs neither the other tests nor the database used for manual
+testing.
 """
 
 from __future__ import annotations
@@ -22,15 +23,12 @@ import pytest
 
 from fraud_mcp.domain import policies
 
+from conftest import needs_model, needs_seed
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_DB = REPO_ROOT / "data" / "fraud.db"
-MODEL = REPO_ROOT / "artifacts" / "model.json"
 DEMO_ACCOUNT = "4471"
 
-pytestmark = pytest.mark.skipif(
-    not SOURCE_DB.exists() or not MODEL.exists(),
-    reason="needs data/fraud.db (scripts/seed_db.py) and artifacts/model.json (scripts/train_model.py)",
-)
+pytestmark = [needs_seed, needs_model]
 
 
 class ServerProcess:
@@ -86,9 +84,10 @@ class ServerProcess:
 
 
 @pytest.fixture
-def server(tmp_path: Path):
+def server(seeded, tmp_path: Path):
+    """A server on its own copy of the database, so each test starts from the same state."""
     database = tmp_path / "fraud.db"
-    shutil.copy(SOURCE_DB, database)
+    shutil.copy(seeded.database, database)
 
     process = ServerProcess(database)
     process.send(
@@ -110,9 +109,9 @@ def text_of(result: dict) -> str:
     return result["content"][0]["text"]
 
 
-def test_the_handshake_negotiates_and_advertises_tools(tmp_path: Path):
+def test_the_handshake_negotiates_and_advertises_tools(seeded, tmp_path: Path):
     database = tmp_path / "fraud.db"
-    shutil.copy(SOURCE_DB, database)
+    shutil.copy(seeded.database, database)
     process = ServerProcess(database)
 
     response = process.send(
