@@ -77,6 +77,7 @@ def test_impossible_geovelocity_fires_between_distant_card_present_purchases():
 
     assert hit.severity == "high"
     assert hit.evidence["implied_speed_kmh"] > rules.IMPOSSIBLE_SPEED_KMH
+    assert hit.evidence["distance_km"] > rules.IMPOSSIBLE_DISTANCE_KM
     assert hit.evidence["previous_transaction_id"] == "txn_previous"
     assert "GT" in hit.reason
 
@@ -95,6 +96,23 @@ def test_geovelocity_accepts_a_reachable_distance():
 
     hits = fired(rules.evaluate(current, ACCOUNT, history(previous)))
     assert "impossible_geovelocity" not in hits
+
+
+def test_geovelocity_ignores_a_nearby_jump_however_fast():
+    """Two purchases minutes apart in the same region are not a travel impossibility.
+
+    Without this floor the rule fired on 3.10% of the consecutive card-present pairs of the
+    dataset, because merchant coordinates sit within ~150 km of the cardholder. That case is
+    what `rapid_succession` is for.
+    """
+    nearby = (HOME[0] + 0.9, HOME[1] + 0.9)  # about 120 km away
+    previous = transaction(ts=NOON - timedelta(minutes=3), txn_id="txn_previous")
+    current = transaction(location=nearby)
+
+    hits = rules.evaluate(current, ACCOUNT, history(previous))
+    assert rules.implied_speed_kmh(current, previous) > rules.IMPOSSIBLE_SPEED_KMH
+    assert "impossible_geovelocity" not in fired(hits)
+    assert "rapid_succession" in fired(hits)
 
 
 def test_geovelocity_needs_a_previous_transaction():

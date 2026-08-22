@@ -1,8 +1,9 @@
 """Explicit fraud rules.
 
 A probability alone cannot be explained to a customer or an auditor, so the score is
-accompanied by rules that state, in words, what is wrong with a transaction. Every
-threshold here comes from the exploratory analysis in `notebooks/01_eda.ipynb`.
+accompanied by rules that state, in words, what is wrong with a transaction. Each threshold
+here is justified in its own comment, and all but one come from the exploratory analysis in
+`notebooks/01_eda.ipynb`.
 
 This module only takes entities and returns findings, with no database, no protocol and no
 model involved.
@@ -15,26 +16,31 @@ from dataclasses import dataclass, field
 
 from fraud_mcp.domain.models import Account, CardHistory, Transaction
 
-# Velocidad de crucero de un avión comercial. En el EDA (#9), el 8.54% de los fraudes exige
-# superarla frente al 2.11% de las transacciones legítimas.
+# Commercial aircraft cruising speed. In EDA (#9), 8.54% of fraudulent transactions
+# require exceeding this threshold, compared with 2.11% of legitimate transactions.
 IMPOSSIBLE_SPEED_KMH = 900.0
 
-# El EDA (#9) midió una razón mediana de 5.23 veces el gasto habitual en los fraudes, frente
-# a 0.66 en las transacciones legítimas.
+# Minimum distance used to flag impossible travel between consecutive transactions.
+# 500 km avoids false positives from nearby purchases while still capturing cross-country jumps.
+IMPOSSIBLE_DISTANCE_KM = 500.0
+
+# EDA (#9) measured a median spending ratio of 5.23x the usual amount for fraudulent
+# transactions, compared with 0.66x for legitimate transactions.
 AMOUNT_RATIO_ALERT = 5.0
 
-# Franja donde se concentra el fraude: 22 y 23 horas al 2.88% y 2.84%, y la madrugada de 0 a
-# 3 alrededor del 1.5%, contra un promedio general de 0.58% (EDA #6).
+# Hours with the highest concentration of fraud: 22:00 and 23:00 at 2.88% and 2.84%,
+# respectively, and 00:00–03:00 at around 1.5%, compared with an overall average of
+# 0.58% (EDA #6).
 NIGHT_HOURS = frozenset({22, 23, 0, 1, 2, 3})
 
-# Las tres categorías con mayor tasa de fraude del EDA (#7).
+# The three categories with the highest fraud rates in EDA (#7).
 HIGH_RISK_CATEGORIES = ("shopping_net", "misc_net", "grocery_pos")
 
-# Los fraudes llegan más pegados al movimiento anterior. Mediana de 82 minutos contra
-# 277 (EDA #9).
+# Fraudulent transactions tend to occur much closer to the previous transaction.
+# Median of 82 minutes versus 277 minutes (EDA #9).
 RAPID_SUCCESSION_MINUTES = 10.0
 
-# A partir de 200 USD la tasa de fraude salta a 4.44%, y sobre 500 USD supera el 23% (EDA #5).
+# Above $200, the fraud rate jumps to 4.44%, and above $500 it exceeds 23% (EDA #5).
 HIGH_AMOUNT_USD = 200.0
 
 
@@ -95,10 +101,14 @@ def evaluate(
 
     if previous is not None:
         speed = implied_speed_kmh(transaction, previous)
-        if speed is not None and speed > IMPOSSIBLE_SPEED_KMH:
-            distance = haversine_km(
-                previous.merch_lat, previous.merch_lon, transaction.merch_lat, transaction.merch_lon
-            )
+        distance = haversine_km(
+            previous.merch_lat, previous.merch_lon, transaction.merch_lat, transaction.merch_lon
+        )
+        if (
+            speed is not None
+            and speed > IMPOSSIBLE_SPEED_KMH
+            and distance > IMPOSSIBLE_DISTANCE_KM
+        ):
             minutes = (transaction.ts - previous.ts).total_seconds() / 60
             hits.append(RuleHit(
                 rule="impossible_geovelocity",
