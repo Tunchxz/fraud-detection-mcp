@@ -1,7 +1,11 @@
-# Generated data and artifacts
-data/
-artifacts/
-captures/
+# Generated data
+data/raw/
+data/processed/
+data/fraud.db
+
+# Generated artifacts, except the trained model
+artifacts/*
+!artifacts/model.json
 
 # Local support files, not part of the project
 tmp/
@@ -10,10 +14,6 @@ tmp/
 .venv/
 __pycache__/
 *.py[cod]
-*.pyc
-*.pyo
-*.pyd
-.pytest_cache/
 
 # Environment
 .env
@@ -25,4 +25,3 @@ __pycache__/
 .agents/
 .claude/
 skills-lock.json
-CLAUDE.md
