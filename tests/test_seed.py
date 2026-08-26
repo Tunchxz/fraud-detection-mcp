@@ -95,13 +95,24 @@ def test_the_demonstration_case_triggers_the_geovelocity_rule(built):
 
 
 def test_the_geovelocity_rule_stays_quiet_on_the_rest_of_the_data(built):
-    """The rule must point at the one impossible jump, not at the generator's noise."""
-    _summary, connection = built
+    """The rule must point at the injected jump, not at the generator's noise.
+
+    Every consecutive card-present pair in the database is walked. Nothing that comes purely
+    from the dataset may fire.
+
+    Pairs that involve an injected transaction are counted apart on purpose. There are two of
+    them, and both are the demonstration: the trip to Guatemala, and the return, which is the
+    cardholder using their own card at home while the clone is still abroad. How much later
+    that return happens depends on the moment of seeding, so only the outbound jump is
+    asserted.
+    """
+    summary, connection = built
+    injected = {row[0] for row in summary.demo_transactions}
     rows = connection.execute(
         "SELECT * FROM transactions WHERE channel = 'in_person' ORDER BY card_id, ts"
     ).fetchall()
 
-    firing = []
+    from_the_dataset, from_the_demo = [], []
     previous = None
     for row in rows:
         if previous is not None and previous["card_id"] == row["card_id"]:
@@ -111,10 +122,19 @@ def test_the_geovelocity_rule_stays_quiet_on_the_rest_of_the_data(built):
                 earlier.merch_lat, earlier.merch_lon, current.merch_lat, current.merch_lon
             )
             if speed and speed > rules.IMPOSSIBLE_SPEED_KMH and distance > rules.IMPOSSIBLE_DISTANCE_KM:
-                firing.append(current.txn_id)
+                pair = (earlier.txn_id, current.txn_id)
+                if injected.isdisjoint(pair):
+                    from_the_dataset.append(pair)
+                else:
+                    from_the_demo.append(pair)
         previous = row
 
-    assert len(firing) == 1, f"expected only the injected case, got {firing[:5]}"
+    assert from_the_dataset == [], f"the rule fired on the dataset itself: {from_the_dataset[:5]}"
+
+    abroad = connection.execute(
+        "SELECT txn_id FROM transactions WHERE country = 'GT'"
+    ).fetchone()["txn_id"]
+    assert any(abroad in pair for pair in from_the_demo), "the injected jump must fire"
 
 
 def test_the_preseeded_state_is_in_place(built):
