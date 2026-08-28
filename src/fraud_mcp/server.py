@@ -1,8 +1,7 @@
 """Builds the fraud monitoring server (identity + the six tools).
 
-The result is transport-agnostic on purpose. The stdio entry point wires it to standard
-input and output; the HTTP entry point will wire the very same registry to a socket, which
-is what makes the local and the remote server one server rather than two.
+The result is transport-agnostic. The stdio entry point wires it to standard
+input and output; the HTTP entry point wires the very same registry to a socket.
 """
 
 from __future__ import annotations
@@ -35,7 +34,7 @@ INSTRUCTIONS = (
 TOOL_MODULES = (accounts, transactions, scoring, cards, cases)
 
 
-def build_context(log=None) -> ToolContext:
+def build_context(log=None, *, same_thread: bool = True) -> ToolContext:
     """Opens the database and loads the model, building the database if it is missing."""
     summary = seed.ensure_database()
     if summary is not None and log is not None:
@@ -44,7 +43,7 @@ def build_context(log=None) -> ToolContext:
             f"{summary.transactions:,} transactions up to {summary.last_ts}"
         )
 
-    return ToolContext(connection=db.connect(), model=RiskModel.load())
+    return ToolContext(connection=db.connect(same_thread=same_thread), model=RiskModel.load())
 
 
 def build_registry(context: ToolContext) -> ToolRegistry:

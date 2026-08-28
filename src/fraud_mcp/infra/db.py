@@ -93,8 +93,13 @@ def database_path() -> Path:
     return Path(override) if override else DEFAULT_DB_PATH
 
 
-def connect(path: Path | str | None = None) -> sqlite3.Connection:
-    """Opens the database. Rows come back as mappings and foreign keys are enforced."""
+def connect(path: Path | str | None = None, *, same_thread: bool = True) -> sqlite3.Connection:
+    """Opens the database. Rows come back as mappings and foreign keys are enforced.
+
+    The connection is threaded, so it is reached from whichever thread is serving the request.
+    The transport serialises every dispatch behind a lock, which is the guarantee `sqlite3` asks
+    for in exchange.
+    """
     location = Path(path) if path is not None else database_path()
     if not location.exists():
         raise FileNotFoundError(
@@ -102,7 +107,7 @@ def connect(path: Path | str | None = None) -> sqlite3.Connection:
             "it, or point FRAUD_MCP_DB at an existing file."
         )
 
-    connection = sqlite3.connect(location)
+    connection = sqlite3.connect(location, check_same_thread=same_thread)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     return connection

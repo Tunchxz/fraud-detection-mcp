@@ -11,9 +11,11 @@ dependencies = [
 
 # The MCP server is launched by a host process with an arbitrary working
 # directory, so the packages must be importable by name rather than by path.
-# Installing the project provides that, plus the console script below.
+# Installing the project provides that, plus the console scripts below. The
+# two of them are the same server (only the transport differs).
 [project.scripts]
 fraud-mcp-stdio = "fraud_mcp.entrypoints.stdio_main:main"
+fraud-mcp-http = "fraud_mcp.entrypoints.http_main:main"
 
 [build-system]
 requires = ["hatchling"]
