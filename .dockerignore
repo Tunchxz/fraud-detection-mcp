@@ -1,0 +1,29 @@
+# The build context is the repository root, and only the server travels into the image.
+# `data/seed/` and `artifacts/model.json` are deliberately NOT excluded: the container builds
+# its database from them at startup.
+
+.git
+.github
+.gitignore
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+
+data/raw
+data/processed
+data/fraud.db
+captures
+
+notebooks
+scripts
+tests
+docs
+src/host
+tmp
+*.md
+.env
+.env.example
+.agents
+.claude
+skills-lock.json
