@@ -4,6 +4,9 @@ Transport module for MCP: message decoding, validation, and serialization.
 This module knows about JSON-RPC only. It does not know what MCP is, nor
 what the messages mean.
 
+Both sides of the wire use it: the server decodes requests and builds responses, the
+host's client builds requests and decodes responses.
+
 Reference: https://www.jsonrpc.org/specification
 """
 
@@ -57,6 +60,23 @@ class Request:
     is_notification: bool = False
 
 
+@dataclass(frozen=True)
+class Response:
+    """An answer to a request, as the client reads it.
+
+    Exactly one of `result` or `error` is present, which is what the specification
+    requires and what `decode_response` enforces.
+    """
+
+    id: str | int | None
+    result: Any = None
+    error: dict | None = None
+
+    @property
+    def is_error(self) -> bool:
+        return self.error is not None
+
+
 def decode(line: str) -> Request:
     """Turns one line of text into a request, or raises `JsonRpcError`."""
     try:
@@ -90,6 +110,52 @@ def decode(line: str) -> Request:
     return Request(
         method=method, params=params, id=identifier, is_notification=is_notification
     )
+
+
+def decode_response(line: str) -> Response:
+    """Turns one line of text into a response, or raises `JsonRpcError`.
+
+    The mirror image of `decode`. A malformed answer is the server's fault rather than the
+    client's, but the error type is the same one: it says what is wrong with the message.
+    """
+    try:
+        message = json.loads(line)
+    except json.JSONDecodeError as exc:
+        raise JsonRpcError(PARSE_ERROR, "Parse error", str(exc)) from exc
+
+    if not isinstance(message, dict):
+        raise JsonRpcError(INVALID_REQUEST, "Response must be a JSON object")
+    if message.get("jsonrpc") != VERSION:
+        raise JsonRpcError(INVALID_REQUEST, f"Field 'jsonrpc' must be '{VERSION}'")
+    if "id" not in message:
+        raise JsonRpcError(INVALID_REQUEST, "A response must carry an 'id'")
+
+    has_result = "result" in message
+    error = message.get("error")
+    if has_result and error is not None:
+        raise JsonRpcError(INVALID_REQUEST, "A response carries 'result' or 'error', not both")
+    if not has_result and error is None:
+        raise JsonRpcError(INVALID_REQUEST, "A response must carry 'result' or 'error'")
+    if error is not None and not isinstance(error, dict):
+        raise JsonRpcError(INVALID_REQUEST, "Field 'error' must be an object")
+
+    return Response(id=message["id"], result=message.get("result"), error=error)
+
+
+def request_message(request_id: str | int, method: str, params: dict | None = None) -> dict:
+    """Builds a request. The client side of `result_message`."""
+    message: dict[str, Any] = {"jsonrpc": VERSION, "id": request_id, "method": method}
+    if params is not None:
+        message["params"] = params
+    return message
+
+
+def notification_message(method: str, params: dict | None = None) -> dict:
+    """Builds a notification: no `id`, and never answered."""
+    message: dict[str, Any] = {"jsonrpc": VERSION, "method": method}
+    if params is not None:
+        message["params"] = params
+    return message
 
 
 def result_message(request_id: str | int | None, result: Any) -> dict:
