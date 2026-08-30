@@ -1,0 +1,53 @@
+{
+  "$comment": [
+    "The four (default) MCP servers the host loads. Values may carry ${VARIABLES}: anything",
+    "from the environment, plus ${REPO_ROOT} and ${WORKSPACE}, which the manager injects.",
+    "A server whose variables are not set is reported and skipped, never guessed at.",
+    "The filesystem and git servers are pointed at the scratch workspace on purpose, so the",
+    "demonstration of other MCPs cannot touch this repository: the filesystem server",
+    "enforces that root itself, and the git server is launched inside it so its relative",
+    "paths land there. Note that `mcp-server-git` takes an explicit repo_path per call and",
+    "dies at startup if --repository is not already a repository, so it gets neither.",
+    "The two fraud entries are the same server on two transports: the host opens one of",
+    "them, never both, so the six tools keep their documented names."
+  ],
+  "servers": {
+    "filesystem": {
+      "transport": "stdio",
+      "description": "Official Filesystem server (Anthropic), restricted to the workspace",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "${WORKSPACE}"
+      ],
+      "cwd": "${WORKSPACE}"
+    },
+    "git": {
+      "transport": "stdio",
+      "description": "Official Git server (Anthropic), run straight from PyPI with uvx",
+      "command": [
+        "uvx",
+        "mcp-server-git"
+      ],
+      "cwd": "${WORKSPACE}"
+    },
+    "fraud-local": {
+      "transport": "stdio",
+      "description": "This project's fraud monitoring server, as a subprocess over stdio",
+      "command": [
+        "uv",
+        "run",
+        "--directory",
+        "${REPO_ROOT}",
+        "fraud-mcp-stdio"
+      ]
+    },
+    "fraud-remote": {
+      "transport": "http",
+      "description": "The very same server, deployed and reached over HTTPS",
+      "url": "${FRAUD_MCP_REMOTE_URL}",
+      "api_key_env": "FRAUD_MCP_API_KEY"
+    }
+  }
+}
