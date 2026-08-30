@@ -40,3 +40,8 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Each test that touches the database copies it (12 MB), and pytest keeps the last three
+# runs' temporary directories by default. To avoid filling the disk in a few runs (which
+# makes a suite suddenly crawl and then fail on unrelated things), keep only the db of
+# failing tests.
+tmp_path_retention_policy = "failed"
