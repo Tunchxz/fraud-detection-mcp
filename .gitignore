@@ -7,6 +7,13 @@ data/fraud.db
 artifacts/*
 !artifacts/model.json
 
+# Wireshark captures and the TLS session keys that decrypt them
+captures/
+
+# The host's scratch area for the filesystem and git servers, and its message log
+workspace/
+logs/
+
 # Local support files, not part of the project
 tmp/
 
@@ -25,3 +32,4 @@ __pycache__/
 .agents/
 .claude/
 skills-lock.json
+CLAUDE.md
