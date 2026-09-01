@@ -4,9 +4,9 @@ version = "0.1.0"
 description = "MCP server and terminal chatbot for bank fraud monitoring"
 requires-python = "==3.12.*"
 dependencies = [
-    "anthropic>=0.40",
+    "google-genai>=2.22",
     "python-dotenv>=1.0",
-    "rich>=13.7",
+    "rich>=15",
 ]
 
 # The MCP server is launched by a host process with an arbitrary working
