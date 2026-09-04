@@ -1,0 +1,34 @@
+# The remote MCP server IaC. Render reads this file to create or update the service.
+
+services:
+  - type: web
+    name: fraud-mcp-remote
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    # Deploys are manual for now: nothing here waits on GitHub Actions, and a push to main
+    # publishes nothing by itself. Creating the blueprint still deploys once; from then on
+    # it is a button in the dashboard.
+    autoDeployTrigger: "off"
+    # Inert while automatic deploys are off, and kept deliberately. It is the record of
+    # exactly what travels into the image, and the workflow step `Keep the Render build
+    # filter in step with the Dockerfile` checks the two against each other. Whenever
+    # automatic deploys come back, a commit that only touches the host, the tests or the
+    # documentation still publishes nothing.
+    buildFilter:
+      paths:
+        - src/mcp_core/**
+        - src/fraud_mcp/**
+        - artifacts/model.json
+        - data/seed/**
+        - deploy/**
+        - pyproject.toml
+        - uv.lock
+        - .dockerignore
+    envVars:
+      # Asked for once, when the blueprint is created, and never stored in the repository.
+      - key: FRAUD_MCP_API_KEY
+        sync: false
