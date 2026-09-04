@@ -127,6 +127,14 @@ Observaciones que la tabla deja en evidencia:
 
 `session.pcapng` contiene el mismo patrón a mayor escala: **10 solicitudes, 1 mensaje de sincronización y 10 respuestas** en 138 segundos, más el `DELETE` del cierre. La estructura es idéntica (un `initialize`, su notificación, un `tools/list` y ocho `tools/call`) porque el ciclo de vida del protocolo no cambia con el número de herramientas invocadas.
 
+![Solicitudes y respuestas descifradas](../captures/images/requests-answers.png)
+
+*Figura 1. `session.pcapng` con el filtro `http`. Se alternan las solicitudes del anfitrión y las respuestas del servidor, y el panel derecho muestra el cuerpo JSON-RPC ya descifrado del `initialize`: `jsonrpc`, `id` y `method` legibles. La trama 204 es el `202 Accepted` de la notificación, sin cuerpo. Las filas hacia `172.217.x.x` son las llamadas al modelo, que viajan por la misma captura.*
+
+![Solicitudes del anfitrión](../captures/images/host-requests.png)
+
+*Figura 2. El mismo archivo con `http.request.method == "POST"`, es decir solo lo que el anfitrión pidió. Se distinguen los `POST /mcp` al servidor remoto de los `POST /v1beta/models/...` al modelo.*
+
 
 ## 4. Capa de Enlace
 
@@ -191,6 +199,10 @@ Ambos extremos anuncian **MSS 1460**, que es la MTU de 1500 menos las cabeceras 
 ### Cierre
 
 Terminación ordenada en cuatro tiempos: el cliente envía `FIN, ACK` (trama 91), el servidor responde con el suyo (92) y el cliente lo acusa (93). No hay `RST` en ningún momento (la sesión se cierra por acuerdo, no por corte).
+
+![Saludos de tres vías](../captures/images/tcp-handshakes.png)
+
+*Figura 3. El filtro `tcp.flags.syn == 1` sobre `session.pcapng` deja a la vista la apertura de cada conexión. La del servidor remoto es el par 181 y 182 (`216.24.57.7`); las demás corresponden a los registros de paquetes y al modelo. El panel derecho muestra el `SYN, ACK` con los parámetros que anuncia el servidor.*
 
 
 ## 7. Capa de Aplicación
@@ -264,6 +276,10 @@ El ciclo de vida completo de la sesión es visible en la captura. La sesión nac
 ## 8. Lo que la Captura Revela del Sistema Completo
 
 Capturar todo el tráfico de la máquina virtual, y no solo el del servidor, dejó a la vista la arquitectura entera. En `session.pcapng`, los nombres solicitados en cada `Client Hello` (SNI) identifican a los interlocutores:
+
+![Los Client Hello y su SNI](../captures/images/client-hello.png)
+
+*Figura 4. `tls.handshake.type == 1` sobre `session.pcapng`. Siete `Client Hello` y, en cada uno, el nombre del servidor al que el anfitrión se conecta. Es el sistema completo en una sola pantalla: los dos registros de donde se descargan los servidores oficiales, el servidor MCP propio y las cuatro conexiones al modelo.*
 
 | Destino                                                            | Quién es                                         |
 | ------------------------------------------------------------------ | ------------------------------------------------ |

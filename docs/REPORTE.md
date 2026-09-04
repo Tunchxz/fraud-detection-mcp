@@ -122,7 +122,7 @@ Un rechazo de negocio no es considerado un fallo, es información que el modelo 
 | `FRAUD_MCP_API_KEY`         | sin definir            | secreto compartido exigido en `/mcp`       |
 | `FRAUD_MCP_ALLOWED_ORIGINS` | vacío                  | orígenes admitidos                         |
 
-La referencia extensa, con ejemplos de uso de cada herramienta y el escenario de demostración completo, está en [`SERVER_SPEC.md`](SERVER_SPEC.md).
+La referencia extensa, con ejemplos de uso de cada herramienta y el escenario de demostración completo, está en [`SERVER.md`](SERVER.md).
 
 
 ## 2. ¿Qué sucede en cada Capa?
