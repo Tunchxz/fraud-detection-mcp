@@ -191,6 +191,28 @@ def test_an_expired_session_is_picked_up_again(remote: HttpClient):
     assert remote.session_id not in (first, "0" * 32), "a new session must have been opened"
 
 
+def test_the_keylog_directory_is_made_before_the_ssl_context(tmp_path: Path):
+    """A missing directory must not stop the client from connecting.
+
+    `ssl.create_default_context()` reads SSLKEYLOGFILE itself and raises when the directory
+    is not there, which is the state of a clean clone the first time somebody sets up a
+    Wireshark capture. Nothing here touches the network: building the connection object
+    does not open it.
+    """
+    destination = tmp_path / "captures" / "sslkeys.log"
+    assert not destination.parent.exists()
+
+    client = HttpClient(
+        "fraud-remote",
+        MessageLog(path=str(tmp_path / "mcp.log")),
+        "https://example.invalid/mcp",
+        keylog=str(destination),
+    )
+    client._connect_socket()
+
+    assert destination.parent.is_dir()
+
+
 def test_the_wrong_shared_secret_is_refused(database: Path, tmp_path: Path):
     server = RemoteServer(database, tmp_path / "server.log")
     client = HttpClient(

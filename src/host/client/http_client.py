@@ -75,12 +75,15 @@ class HttpClient(McpClient):
             self.connection.close()
 
         if self.secure:
+            # The whole Wireshark analysis hangs off these three lines: the client writes
+            # the TLS session secrets and Wireshark uses them to decrypt its own capture.
+            keylog = Path(self.keylog).expanduser() if self.keylog else None
+            if keylog is not None:
+                keylog.parent.mkdir(parents=True, exist_ok=True)
+
             context = ssl.create_default_context()
-            if self.keylog:
-                # The whole Wireshark analysis hangs off this line: the client writes the
-                # session secrets and Wireshark uses them to decrypt its own capture.
-                Path(self.keylog).expanduser().parent.mkdir(parents=True, exist_ok=True)
-                context.keylog_filename = str(Path(self.keylog).expanduser())
+            if keylog is not None:
+                context.keylog_filename = str(keylog)
             self.connection = http.client.HTTPSConnection(
                 self.host, self.port, timeout=self.timeout, context=context
             )
