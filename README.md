@@ -1,132 +1,83 @@
 # Fraud Detection MCP
 
-An MCP server that turns a bank fraud investigation into tools a language model can use, and a terminal chatbot that acts as its host. Built for **CC3067-Redes** at Universidad del Valle de Guatemala, where the assignment requires implementing the Model Context Protocol **from scratch**.
+A bank fraud monitoring server for the Model Context Protocol, and a terminal chatbot that uses it. Both sides of the protocol are written from scratch, without an MCP SDK.
 
-A fraud analyst normally jumps between separate systems to resolve a single alert. This server exposes those steps (look up the account, list the movements, score a transaction, freeze the card, open a dispute) so the whole investigation happens in one conversation, while the decisions that matter stay on the server side and out of the model's reach.
+Everything runs on simulated data, so no real cardholder, card number or transaction is involved.
 
-Everything runs on **simulated data**. No real cardholder, card number or transaction is involved.
+## What it does
 
-## Requirements
+A fraud analyst normally moves between several systems to resolve a single alert. This project turns those steps into MCP tools, so the whole investigation happens in one conversation while the decisions that matter stay on the server and out of the model's reach.
 
-- [uv](https://docs.astral.sh/uv/). It installs the pinned Python 3.12 for you.
-- Nothing else. The server itself runs on the Python standard library alone; the trained model
-  travels in the repository as JSON file.
+The chatbot acts as an MCP host. It connects to four servers at once, the official Filesystem and Git servers plus this project's own over either stdio or HTTPS, and offers every tool they publish to a language model.
+
+## Features
+
+- **Six fraud tools.** Account lookup, transaction listing, risk scoring, card freeze, dispute filing and case status.
+- **Explainable verdicts.** A logistic regression supplies the score and a layer of explicit rules supplies the reasons, with the evidence behind each one.
+- **Two controls the model cannot bypass.** Freezing a card takes a confirmation token, and a dispute is refused outside the claim window or below medium risk. Both live in the server, not in the prompt.
+- **One server, two transports.** The same tool registry runs as a local subprocess and as a deployed HTTPS service. The chatbot uses either one the same way.
+- **Hand written protocol.** JSON-RPC 2.0, the MCP handshake, session management and both transports are project code, on the client and on the server.
+- **A terminal interface** built with `rich`, with a live log of every MCP message.
+
+## Repository structure
+
+```
+src/
+  mcp_core/        protocol core, shared by client and server
+  fraud_mcp/       the fraud server, its tools, domain and storage
+  host/            the chatbot, its MCP clients and terminal interface
+config/            the four MCP servers the host loads
+scripts/           offline commands for the dataset, the model and the database
+notebooks/         exploratory analysis behind the model
+tests/             unit tests and full sessions over both transports
+deploy/            container image and cloud blueprint
+captures/          Wireshark captures and screenshots
+docs/              documentation
+```
 
 ## Quick start
+
+Only [uv](https://docs.astral.sh/uv/) is needed. It installs the pinned Python 3.12 for you.
 
 ```bash
 git clone https://github.com/Tunchxz/fraud-detection-mcp.git
 cd fraud-detection-mcp
 uv sync
+```
+
+Run the MCP server on its own.
+
+```bash
 uv run fraud-mcp-stdio
 ```
 
-That is the whole setup. On its first run the server builds `data/fraud.db` from the seed extract versioned under `data/seed/`, which takes about a second, and then waits for JSON-RPC messages on standard input. To check it by hand:
+On its first run it builds `data/fraud.db` from the seed extract stored in the repository, which takes about a second, and then waits for JSON-RPC messages on standard input.
+
+Or run the chatbot that uses it. It needs a Gemini API key, which is free and takes a minute to obtain at [Google AI Studio](https://aistudio.google.com).
 
 ```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}' \
-  | uv run fraud-mcp-stdio
+cp .env.example .env        # then put your key in GEMINI_API_KEY
+uv run python -m host.main
 ```
 
-The seeded database always carries **current dates**, every timestamp is shifted so the newest transaction lands on the moment of seeding. Rebuild it whenever you want a clean state:
+Then ask it something.
 
-```bash
-uv run python scripts/seed_db.py --force
-```
+> Account 4471 has an alert. Review the last 7 days, freeze the card if there is fraud, and open the disputes that apply.
 
-That command also prints which account demonstrates which rule.
+## Documentation
 
-## Connecting a host
-
-The server speaks stdio, so any MCP host can launch it. All a host needs is the command:
-
-```
-uv run --directory </absolute/path/to/fraud-detection-mcp> fraud-mcp-stdio
-```
-
-### Example
-
-For **Claude Desktop**, add this to `claude_desktop_config.json` (`%APPDATA%\Claude\` on Windows, `~/Library/Application Support/Claude/` on macOS) and restart the app:
-
-```json
-{
-  "mcpServers": {
-    "fraud-monitoring": {
-      "command": "uv",
-      "args": ["run", "--directory", "</absolute/path/to/fraud-detection-mcp>", "fraud-mcp-stdio"]
-    }
-  }
-}
-```
-
-If Claude Desktop runs on Windows and the repository lives inside WSL (like my case), cross the bridge instead:
-
-```json
-{
-  "mcpServers": {
-    "fraud-monitoring": {
-      "command": "wsl.exe",
-      "args": ["-e", "bash", "-lc",
-               "cd /home/<user>/fraud-detection-mcp && ~/.local/bin/uv run fraud-mcp-stdio"]
-    }
-  }
-}
-```
-
-## What the server exposes
-
-| Tool                | What it does (returns)                                                             |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| `get_account`       | Cardholder, card status and spending habits                                        |
-| `list_transactions` | Recent movements, newest first, filterable by amount and channel                   |
-| `score_transaction` | Risk score plus the explicit rules it violates, with evidence                      |
-| `freeze_card`       | Blocks the card (**needs a confirmation token**)                                   |
-| `open_dispute`      | Opens a chargeback claim (refused outside the 120 day window or below medium risk) |
-| `get_case_status`   | Case status, amount under dispute and the transactions it covers                   |
-
-The risk verdict is hybrid: a logistic regression trained offline supplies the score, and a layer of explicit rules supplies the reasons.
-
-The two controls above are enforced in the server, not suggested to the model; no phrasing of a request gets a card frozen without a confirmation token, or a stale transaction disputed.
-
-## Try the demonstration
-
-Account **4471** is seeded with a complete case. Ask the host:
-
-> *"Account 4471 has an alert. Review the last 7 days, freeze the card if there is fraud, and open the disputes that apply."*
-
-Expected: a purchase in Guatemala 14 minutes after one in the United States flagged as high risk at over 15,000 km/h, a freeze that first returns a confirmation token and only then takes effect, and a six-month-old charge refused for being past the claim window.
-
-Accounts **4472** (card already frozen) and **4474** (open case with a dispute) cover the remaining paths.
+| Document                                | Contents                                                                     |
+| --------------------------------------- | ---------------------------------------------------------------------------- |
+| [Server reference](docs/SERVER.md)      | The MCP server in full, with its tools, endpoints, errors and usage examples |
+| [Chatbot guide](docs/HOST.md)           | How to configure and use the terminal host                                   |
+| [Wireshark analysis](docs/WIRESHARK.md) | Traffic capture and layer by layer analysis, in Spanish                      |
+| [Project report](docs/REPORTE.md)       | Course report and conclusions, in Spanish                                    |
 
 ## Development
 
 ```bash
-uv sync --group dev          # test dependencies
-uv run pytest                # unit tests plus a full session over stdio
+uv sync --group dev
+uv run pytest
 ```
 
-Useful environment variables: `FRAUD_MCP_DB` and `FRAUD_MCP_MODEL` override the database and model paths, and `FRAUD_MCP_LOG` writes every JSON-RPC message to a file.
-
-### Rebuilding the model
-
-The model in `artifacts/model.json` is versioned, so this is only needed to retrain it. It requires the [Credit Card Transactions Fraud Detection Dataset](https://www.kaggle.com/datasets/kartik2112/fraud-detection)
-(kartik2112 on Kaggle, ~500 MB) extracted into `data/raw/`:
-
-```bash
-uv sync --group train
-uv run python scripts/prepare_dataset.py    # raw CSV  → data/processed/
-uv run python scripts/train_model.py        # training → artifacts/model.json
-uv run python scripts/extract_seed.py       # raw CSV  → data/seed/
-```
-
-`scripts/train_model.py` re-implements the model in pure Python and refuses to write the artifact if its score differs from scikit-learn's by more than `1e-9`. The exploration behind every preprocessing decision is in `notebooks/`.
-
-## Repository layout
-
-```
-src/mcp_core/      MCP from scratch: JSON-RPC codec, session, transports
-src/fraud_mcp/     the fraud server: tools, domain rules, SQLite access
-scripts/           offline commands: dataset, training, seed extract, database
-notebooks/         exploratory analysis and modelling
-tests/             unit tests and an end-to-end stdio session
-```
+The suite covers the protocol codec, the domain rules, the critical policies and full sessions against the real server over both transports. No test calls a model API, so it needs no key and spends no quota.

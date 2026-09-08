@@ -7,8 +7,8 @@ data/fraud.db
 artifacts/*
 !artifacts/model.json
 
-# Wireshark captures and the TLS session keys that decrypt them
-captures/
+# TLS session keys that decrypt the wireshark captures.
+captures/*.log
 
 # The host's scratch area for the filesystem and git servers, and its message log
 workspace/
